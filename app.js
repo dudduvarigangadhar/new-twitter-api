@@ -27,6 +27,7 @@ initialDBAndServer();
 
 const authenticate = (request, response, next) => {
   let jwtToken;
+
   const authHeader = request.headers["authorization"];
   if (authHeader !== undefined) {
     jwtToken = authHeader.split(" ")[1];
@@ -35,15 +36,28 @@ const authenticate = (request, response, next) => {
     response.status(401);
     response.send("Invalid JWT Token");
   } else {
-    jwt.verify(jwtToken, "TOKEN", async (error, payload) => {
+    jwt.verify(jwtToken, "TOKEN", async (error, payLoad) => {
       if (error) {
         response.status(401);
         response.send("Invalid JWT Token");
       } else {
+        request.headers.username = payLoad.username;
         next();
       }
     });
   }
+};
+const getFollowedPeopleIdsOfUser = async (username) => {
+  console.log("get followed", username);
+  const getUsers = `SELECT following_user_id FROM follower 
+    INNER JOIN user ON user.user_id = follower.follower_user_id
+    WHERE user.username = '${username}';`;
+  const followingPeople = await db.all(getUsers);
+  console.log(followingPeople);
+  const arrayOfIds = followingPeople.map(
+    (eachUser) => eachUser.following_user_id
+  );
+  return arrayOfIds;
 };
 app.post("/register/", async (request, response) => {
   const { username, password, name, gender } = request.body;
@@ -97,12 +111,24 @@ app.post("/login/", async (request, response) => {
 });
 
 app.get("/user/tweets/feed/", authenticate, async (request, response) => {
-  const getTweets = `SELECT username,tweet,date_time AS dateTime FROM user LEFT JOIN tweet ON user.user_id = tweet.user_id
-    ORDER BY tweet.user_id DESC
+  const { username } = request.headers;
+  //   console.log(request);
+
+  const getUser = `SELECT * FROM user WHERE username = '${username}';`;
+  const dbUser = await db.get(getUser);
+  const userId = dbUser["user_id"];
+
+  //   const followingPeopleIds = await getFollowedPeopleIdsOfUser(username);
+  const query = `
+  SELECT username,tweet,date_time AS dateTime 
+  FROM follower INNER JOIN tweet 
+  ON follower.following_user_id = tweet.user_id
+  NATURAL JOIN user
+  WHERE follower.follower_user_id = '${userId}'
+  ORDER BY dateTime DESC
     LIMIT 4
-    OFFSET 0;
     ;`;
-  const dbResponse = await db.all(getTweets);
+  const dbResponse = await db.all(query);
   response.send(dbResponse);
 });
 
