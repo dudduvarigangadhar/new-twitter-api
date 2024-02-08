@@ -1,3 +1,4 @@
+https://github.com/Santhu2022/Twitter-Node-Js-Coding-Assignment-2/blob/main/app.js
 POST http://localhost:3000/register/ 
 Content-Type: application/json
 
